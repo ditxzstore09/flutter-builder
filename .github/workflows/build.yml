@@ -11,6 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Find and move pubspec.yaml
+        run: |
+          # Cari file pubspec.yaml di mana aja
+          find . -name "pubspec.yaml" -exec dirname {} \; | head -1 > project_dir.txt
+          PROJECT_DIR=$(cat project_dir.txt)
+          echo "Project ditemukan di: $PROJECT_DIR"
+          cd $PROJECT_DIR
+          echo "PWD=$(pwd)" >> $GITHUB_ENV
+      
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -18,11 +27,12 @@ jobs:
       
       - name: Build APK
         run: |
+          cd $PWD
           flutter pub get
           flutter build apk --release
       
       - name: Upload APK
-        uses: actions/upload-artifact@v4  # GANTI KE V4!
+        uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: ${{ env.PWD }}/build/app/outputs/flutter-apk/*.apk
