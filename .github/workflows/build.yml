@@ -11,14 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Find and move pubspec.yaml
+      - name: Debug - Lihat isi folder
         run: |
-          # Cari file pubspec.yaml di mana aja
-          find . -name "pubspec.yaml" -exec dirname {} \; | head -1 > project_dir.txt
-          PROJECT_DIR=$(cat project_dir.txt)
-          echo "Project ditemukan di: $PROJECT_DIR"
-          cd $PROJECT_DIR
-          echo "PWD=$(pwd)" >> $GITHUB_ENV
+          echo "=== ISI FOLDER ==="
+          ls -la
+          echo ""
+          echo "=== CARI PUBSPEC.YAML ==="
+          find . -name "pubspec.yaml"
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -27,7 +26,20 @@ jobs:
       
       - name: Build APK
         run: |
-          cd $PWD
+          # Cari pubspec.yaml
+          PUBSPEC_PATH=$(find . -name "pubspec.yaml" | head -1)
+          
+          if [ -z "$PUBSPEC_PATH" ]; then
+            echo "❌ TIDAK ADA PUBSPEC.YAML!"
+            exit 1
+          fi
+          
+          PROJECT_DIR=$(dirname "$PUBSPEC_PATH")
+          echo "✅ Project ditemukan di: $PROJECT_DIR"
+          
+          cd "$PROJECT_DIR"
+          echo "📍 Pindah ke: $(pwd)"
+          
           flutter pub get
           flutter build apk --release
       
@@ -35,4 +47,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
-          path: ${{ env.PWD }}/build/app/outputs/flutter-apk/*.apk
+          path: **/build/app/outputs/flutter-apk/*.apk
