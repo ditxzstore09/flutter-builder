@@ -11,9 +11,25 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
+      - name: Extract ZIP
+        run: |
+          # Cari file zip
+          ZIP_FILE=$(find . -name "*.zip" | head -1)
+          if [ ! -z "$ZIP_FILE" ]; then
+            echo "📦 Extract: $ZIP_FILE"
+            unzip "$ZIP_FILE" -d extracted/
+            rm "$ZIP_FILE"
+          fi
+          
+          # Pindahin hasil extract ke root
+          if [ -d "extracted" ]; then
+            mv extracted/*/* ./ 2>/dev/null || mv extracted/* ./ 2>/dev/null
+            rm -rf extracted
+          fi
+      
       - name: Debug - Lihat isi folder
         run: |
-          echo "=== ISI FOLDER ==="
+          echo "=== ISI FOLDER SETELAH EXTRACT ==="
           ls -la
           echo ""
           echo "=== CARI PUBSPEC.YAML ==="
