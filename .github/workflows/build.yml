@@ -11,42 +11,54 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       
-      - name: Extract ZIP
+      - name: 📦 Extract ZIP jika ada
         run: |
-          # Cari file zip
-          ZIP_FILE=$(find . -name "*.zip" | head -1)
-          if [ ! -z "$ZIP_FILE" ]; then
-            echo "📦 Extract: $ZIP_FILE"
-            unzip "$ZIP_FILE" -d extracted/
-            rm "$ZIP_FILE"
-          fi
+          echo "=== MENCARI FILE ZIP ==="
+          ZIP_FILE=$(find . -name "*.zip" -type f | head -1)
           
-          # Pindahin hasil extract ke root
-          if [ -d "extracted" ]; then
-            mv extracted/*/* ./ 2>/dev/null || mv extracted/* ./ 2>/dev/null
-            rm -rf extracted
+          if [ ! -z "$ZIP_FILE" ]; then
+            echo "✅ Ditemukan ZIP: $ZIP_FILE"
+            echo "📂 Mengextract..."
+            unzip -o "$ZIP_FILE" -d extracted/
+            rm "$ZIP_FILE"
+            
+            # Pindahin isi extracted ke root
+            if [ -d "extracted" ]; then
+              # Cek apakah ada folder di dalamnya
+              SUBDIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -1)
+              if [ ! -z "$SUBDIR" ]; then
+                mv extracted/*/* ./ 2>/dev/null || mv extracted/* ./ 2>/dev/null
+              else
+                mv extracted/* ./ 2>/dev/null
+              fi
+              rm -rf extracted
+            fi
+            echo "✅ Extract selesai"
+          else
+            echo "ℹ️ Tidak ada file ZIP, lanjut..."
           fi
       
-      - name: Debug - Lihat isi folder
+      - name: 🔍 Debug - Lihat struktur folder
         run: |
-          echo "=== ISI FOLDER SETELAH EXTRACT ==="
+          echo "=== ISI FOLDER ==="
           ls -la
           echo ""
-          echo "=== CARI PUBSPEC.YAML ==="
+          echo "=== MENCARI PUBSPEC.YAML ==="
           find . -name "pubspec.yaml"
       
-      - name: Setup Flutter
+      - name: 🎯 Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.13.0'
+          channel: 'stable'
       
-      - name: Build APK
+      - name: 🏗️ Build APK
         run: |
-          # Cari pubspec.yaml
+          # Cari pubspec.yaml (auto detect)
           PUBSPEC_PATH=$(find . -name "pubspec.yaml" | head -1)
           
           if [ -z "$PUBSPEC_PATH" ]; then
-            echo "❌ TIDAK ADA PUBSPEC.YAML!"
+            echo "❌ ERROR: TIDAK ADA PUBSPEC.YAML!"
             exit 1
           fi
           
@@ -56,11 +68,23 @@ jobs:
           cd "$PROJECT_DIR"
           echo "📍 Pindah ke: $(pwd)"
           
+          # Fix SDK version jika terlalu tinggi
+          if grep -q "sdk: \">=3.[8-9]" pubspec.yaml; then
+            echo "⚠️ SDK version terlalu tinggi, menurunkan..."
+            sed -i 's/sdk: ">=3.[0-9]*/sdk: ">=3.0.0/' pubspec.yaml
+          fi
+          
+          # Bersihkan dan build
+          flutter clean
           flutter pub get
           flutter build apk --release
       
-      - name: Upload APK
+      - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
           path: "**/build/app/outputs/flutter-apk/*.apk"
+          if-no-files-found: error
+      
+      - name: ✅ Selesai
+        run: echo "Build selesai! APK siap di download dari artifacts"
