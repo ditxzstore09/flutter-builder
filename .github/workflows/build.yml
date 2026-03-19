@@ -3,59 +3,39 @@ name: Build Flutter APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # Bisa manual trigger
+    inputs:
+      version:
+        description: 'Version name'
+        required: false
+        default: '1.0.0'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v3
-
-      - name: 📦 Extract ZIP otomatis
-        run: |
-          ZIP_FILE=$(find . -name "*.zip" | head -1)
-          if [ -n "$ZIP_FILE" ]; then
-            unzip -o "$ZIP_FILE" -d extracted/
-            rm "$ZIP_FILE"
-            # Cari pubspec.yaml di mana aja
-            PUBSPEC_DIR=$(find extracted -name "pubspec.yaml" -exec dirname {} \; | head -1)
-            if [ -n "$PUBSPEC_DIR" ]; then
-              mv "$PUBSPEC_DIR"/* .
-            else
-              mv extracted/*/* . 2>/dev/null || mv extracted/* . 2>/dev/null
-            fi
-            rm -rf extracted
-          fi
-
-      - name: 🔧 Fix SDK version (otomatis)
-        run: |
-          if [ -f "pubspec.yaml" ]; then
-            # Paksa SDK ke >=3.0.0
-            sed -i 's/sdk:.*/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
-            echo "✅ SDK version sudah di-fix"
-          else
-            echo "❌ pubspec.yaml tidak ditemukan"
-            exit 1
-          fi
-
-      - name: 🎯 Setup Flutter (VERSI TERBARU)
+      
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.x'
           channel: 'stable'
-          cache: true
-
-      - name: 🏗️ Build APK
-        run: |
-          flutter clean
-          flutter pub get
-          flutter build apk --release --split-per-abi
-
-      - name: 📤 Upload APK
-        uses: actions/upload-artifact@v4
+      
+      - name: Install dependencies
+        run: flutter pub get
+      
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+      
+      - name: Upload APK to artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: flutter-apk
+          name: flutter-apks
           path: build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
-
-      - name: ✅ Notifikasi selesai
-        run: echo "✅ APK siap!"
+      
+      - name: Get Download URL
+        id: get_url
+        run: |
+          echo "download_url=https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_OUTPUT
