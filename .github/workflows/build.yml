@@ -10,70 +10,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
-      - name: 📦 Extract ZIP
+
+      - name: 📦 Extract ZIP otomatis
         run: |
           ZIP_FILE=$(find . -name "*.zip" | head -1)
           if [ -n "$ZIP_FILE" ]; then
             unzip -o "$ZIP_FILE" -d extracted/
             rm "$ZIP_FILE"
-            if [ -d "extracted" ]; then
-              # Cek struktur folder
-              SUBDIR=$(find extracted -mindepth 1 -maxdepth 1 -type d | head -1)
-              if [ -n "$SUBDIR" ]; then
-                mv extracted/*/* ./ 2>/dev/null
-              else
-                mv extracted/* ./ 2>/dev/null
-              fi
-              rm -rf extracted
+            # Cari pubspec.yaml di mana aja
+            PUBSPEC_DIR=$(find extracted -name "pubspec.yaml" -exec dirname {} \; | head -1)
+            if [ -n "$PUBSPEC_DIR" ]; then
+              mv "$PUBSPEC_DIR"/* .
+            else
+              mv extracted/*/* . 2>/dev/null || mv extracted/* . 2>/dev/null
             fi
+            rm -rf extracted
           fi
-      
-      - name: 🔍 Cari dan Fix pubspec.yaml
+
+      - name: 🔧 Fix SDK version (otomatis)
         run: |
-          # Cari semua pubspec.yaml
-          find . -name "pubspec.yaml" | while read file; do
-            echo "🔧 Memperbaiki: $file"
-            # Backup dulu
-            cp "$file" "$file.bak"
-            # Ganti SDK version jadi minimal
-            sed -i 's/sdk:.*/sdk: ">=3.0.0 <4.0.0"/' "$file"
-            # Tampilkan hasil
-            echo "✅ Isi setelah fix:"
-            grep -A2 "environment:" "$file"
-          done
-      
-      - name: 🎯 Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.13.0'
-      
-      - name: 🏗️ Build APK
-        run: |
-          # Cari pubspec.yaml yang udah di-fix
-          PUBSPEC_PATH=$(find . -name "pubspec.yaml" | head -1)
-          if [ -z "$PUBSPEC_PATH" ]; then
-            echo "❌ TIDAK ADA PUBSPEC.YAML!"
+          if [ -f "pubspec.yaml" ]; then
+            # Paksa SDK ke >=3.0.0
+            sed -i 's/sdk:.*/sdk: ">=3.0.0 <4.0.0"/' pubspec.yaml
+            echo "✅ SDK version sudah di-fix"
+          else
+            echo "❌ pubspec.yaml tidak ditemukan"
             exit 1
           fi
-          
-          PROJECT_DIR=$(dirname "$PUBSPEC_PATH")
-          echo "✅ Project di: $PROJECT_DIR"
-          
-          cd "$PROJECT_DIR"
-          echo "📍 Pindah ke: $(pwd)"
-          
-          # Verifikasi SDK version
-          echo "🔍 Cek SDK version:"
-          grep -A2 "environment:" pubspec.yaml
-          
-          # Clean & build
+
+      - name: 🎯 Setup Flutter (VERSI TERBARU)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: 🏗️ Build APK
+        run: |
           flutter clean
           flutter pub get
-          flutter build apk --release
-      
+          flutter build apk --release --split-per-abi
+
       - name: 📤 Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
-          path: "**/build/app/outputs/flutter-apk/*.apk"
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+
+      - name: ✅ Notifikasi selesai
+        run: echo "✅ APK siap!"
