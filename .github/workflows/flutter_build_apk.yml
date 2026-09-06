@@ -1,0 +1,46 @@
+name: Flutter Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: 'Job ID'
+        required: true
+      zip_path:
+        description: 'Path zip di repo'
+        required: false
+      zip_url:
+        description: 'URL zip external'
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+      
+      - name: Download ZIP
+        run: |
+          if [ -n "${{ inputs.zip_path }}" ]; then
+            curl -L -o project.zip "https://raw.githubusercontent.com/${{ github.repository }}/main/${{ inputs.zip_path }}"
+          elif [ -n "${{ inputs.zip_url }}" ]; then
+            curl -L -o project.zip "${{ inputs.zip_url }}"
+          else
+            exit 1
+          fi
+      
+      - name: Unzip & Build
+        run: |
+          unzip -o project.zip -d project/
+          cd project
+          flutter pub get
+          flutter build apk --release
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ inputs.job_id }}
+          path: project/build/app/outputs/flutter-apk/*.apk
